@@ -1,0 +1,58 @@
+body{
+
+	background-color:#000;
+	background-image:url("/img/background3.jpg");
+	background-attachment:fixed;
+   background-position:center; 
+	background-repeat: no-repeat;
+	margin: 0; 
+	padding: 0;
+}
+
+.outer {
+    display: table;
+    position: absolute;
+    height: 100%;
+    width: 100%;
+}
+
+.middle {
+    display: table-cell;
+    vertical-align: middle;
+}
+
+.inner {
+    margin-left: auto;
+    margin-right: auto; 
+    width: 400px;
+    height: 150px;
+    background: #000;
+    color: #fff;
+    border-radius: 10px;
+    padding: 10px;
+    opacity: 0.8;
+   	z-index: 999;
+}
+
+.username{
+	border: none;
+	border-radius: 5px;
+	width: 100%;
+	margin-top: 20px;
+	height: 30px;
+	background: #444444;
+	max-width: 370px;
+	padding-left: 30px;
+	color: white;
+}
+
+.password{
+	border: none;
+	border-radius: 5px;
+	width: 100%;
+	margin-top: 20px;
+	height: 30px;
+	background: #444444;
+	max-width: 370px;
+	padding-left: 30px;
+}
