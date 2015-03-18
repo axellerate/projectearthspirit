@@ -5,6 +5,10 @@ api_version: 1
 threadsafe: true
 
 handlers:
+#endpoints handler
+- url: /_ah/spi/.*
+  script: main.application
+
 - url: /static
   static_dir: static
 
