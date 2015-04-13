@@ -95,10 +95,21 @@ class Cars(ndb.Model):
 class UserCars(ndb.Model):
     user = ndb.KeyProperty(kind = Users)
     car = ndb.KeyProperty(kind = Cars)
+    created = ndb.DateTimeProperty(auto_now_add = True)
+    edited = ndb.DateTimeProperty(auto_now = True)
 
-class CarEmissions(ndb.Model):
+class UserCarDistance(ndb.Model):
+    user = ndb.KeyProperty(kind = Users)
     car = ndb.KeyProperty(kind = Cars)
-    grams = ndb.IntegerProperty(required = True)
+    distance = ndb.IntegerProperty(required = True)
+    created = ndb.DateTimeProperty(auto_now_add = True)
+    edited = ndb.DateTimeProperty(auto_now = True)
+
+class UserHome(ndb.Model):
+    user = ndb.KeyProperty(kind = Users)
+    electricity = ndb.IntegerProperty(required = True)
+    water = ndb.IntegerProperty(required = True)
+    gas = ndb.IntegerProperty(required = True)
 
 def create_countries():
     list_countries = countries.split('},')
@@ -137,9 +148,17 @@ class CreateUser(messages.Message):
 
 
 class AddCar(messages.Message):
-    user = messages.IntegerField(1, required = True)
-    car = messages.IntegerField(2, required = True)
+    user = messages.StringField(1, required = True)
+    car = messages.StringField(2, required = True)
 
+class ShowUserCars(messages.Message):
+    make = messages.StringField(1)
+    model = messages.StringField(2)
+    year = messages.StringField(3)
+    emissions = messages.StringField(4)
+
+class UserCarsVM(messages.Message):
+    cars = messages.MessageField(ShowUserCars, 1, repeated = True)
 
 @endpoints.api(name = 'users', version = 'v1',
                description = 'Fetch and Create User Data')
@@ -161,10 +180,12 @@ class UserApi(remote.Service):
                         path = 'createuser',
                         http_method = 'POST')
     def createUser(self, request):
+        #Country(name = "Canada").put()
         user_query = Users.query(Users.email == request.email)
         if not user_query.get():
+          user_country = Country.query(Country.name == request.country).get()
           Users(email = request.email, firstName = request.firstName,
-                lastName = request.lastName, pw_hash = request.pw_hash).put()
+                lastName = request.lastName, pw_hash = request.pw_hash, country = user_country.key).put()
         return request
 
     @endpoints.method(AddCar, message_types.VoidMessage,
@@ -172,11 +193,26 @@ class UserApi(remote.Service):
                         path = 'addCar',
                         http_method = 'POST')
     def addCarToUser(self, request):
-        user = Users.get_by_id(request.user)
-        car = Cars.get_by_id(request.car)
-        UserCars(car = car.key, user = user.key).put()
-        return message_types.VoidMessage()
+        user_query = Users.query(Users.email == request.user).get()
+        car_query = Cars.query(Cars.carId == int(request.car)).get()
+        print user_query.key
+        print car_query
+        UserCars(car = car_query.key, user = user_query.key).put()
+        return message_types.VoidMessage() 
 
+
+    @endpoints.method(UserInfo, UserCarsVM,
+                        name = 'cars.show',
+                        path = 'cars',
+                        http_method = 'GET')
+    def showUserCars(self, request):
+        user = Users.query(Users.email == request.email).get()
+        all_cars = []
+        cars = UserCars.query(UserCars.user == user.key)
+        for i in cars:
+            car_object = Cars.query(Cars.key == i.car).get()
+            all_cars.append(ShowUserCars(emissions = str(car_object.emissionsPerKm), make = car_object.make, model = car_object.model, year = str(car_object.year)))
+        return UserCarsVM(cars = all_cars)
 
 
 
@@ -210,8 +246,8 @@ class CarsApi(remote.Service):
         if not car_query.get():
           url = "http://fueleconomy.gov/ws/rest/vehicle/%s" %request.carId
           xml = urllib2.urlopen(url).read()
-          start = xml.find("<co2>")+5
-          end = xml.find("</co2>")
+          start = xml.find("<co2TailpipeGpm>")+16
+          end = xml.find("</co2TailpipeGpm>")
           emissions = float(xml[start:end]) * 0.621371
           Cars(emissionsPerKm = emissions, make = request.make, model = request.model, year = int(request.year), carId = int(request.carId), carType = request.carType).put()
         return request
@@ -260,7 +296,45 @@ class CountriesApi(remote.Service):
             all_countries.append(ShowCountries(name = i.name))
         return AllCountries(countries = all_countries)
 
-application = endpoints.api_server([UserApi, CarsApi, CountriesApi])
+class Home(messages.Message):
+    user = messages.StringField(1)
+    electricity = messages.IntegerField(2)
+    water = messages.IntegerField(3)
+    gas = messages.IntegerField(4)
+
+@endpoints.api(name = 'home', version = 'v1',
+               description = 'Fetch and Create Home Data')
+class HomeApi(remote.Service):
+    @endpoints.method(Home, message_types.VoidMessage,
+                        name = 'home.homeEmissions',
+                        path = 'homeEmissions',
+                        http_method = 'POST')
+    def addHomeEmissions(self, request):
+        user = Users.query(Users.email == request.user).get()
+        UserHome(user = user.key, electricity = int(request.electricity),
+            water = int(request.water), gas = int(request.gas)).put()
+        return message_types.VoidMessage() 
+
+class UserDistance(messages.Message):
+    car = messages.StringField(1)
+    user = messages.StringField(2)
+    distance = messages.IntegerField(3)
+
+
+@endpoints.api(name = 'emissions', version = 'v1',
+               description = 'Fetch and Create Emissions Data')
+class EmissionsApi(remote.Service):
+    @endpoints.method(UserDistance, message_types.VoidMessage,
+                        name = 'emissions.carEmissions',
+                        path = 'carEmissions',
+                        http_method = 'POST')
+    def addCarEmissions(self, request):
+        user = Users.query(Users.email == request.user).get()
+        car = Cars.query(Cars.carId == int(request.car)).get()
+        UserCarDistance(car = car.key, user = user.key, distance = int(request.distance)).put()
+        return message_types.VoidMessage() 
+
+application = endpoints.api_server([UserApi, CarsApi, HomeApi, CountriesApi, EmissionsApi])
 
 app = webapp2.WSGIApplication([('/', MainPage)],
                               debug=True)
